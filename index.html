@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PayFlow · Secure Online Payments</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  /* ---------- RESET & BASE ---------- */
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Roboto, system-ui, sans-serif; }
+  :root {
+    --primary: #6366f1;
+    --primary-hover: #4f46e5;
+    --bg: #f8fafc;
+    --card-bg: #ffffff;
+    --text: #1e293b;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --success: #10b981;
+    --error: #ef4444;
+    --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    background-image: radial-gradient(circle at top right, rgba(99, 102, 241, 0.1), transparent 40%),
+                      radial-gradient(circle at bottom left, rgba(16, 185, 129, 0.05), transparent 40%);
+  }
+
+  /* ---------- MAIN CONTAINER ---------- */
+  .payment-wrapper {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    background: var(--card-bg);
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+    width: 100%;
+    max-width: 950px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    animation: slideUp 0.5s ease-out;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---------- LEFT PANEL: CHECKOUT ---------- */
+  .checkout-panel { padding: 3rem 2.5rem; }
+  .header { margin-bottom: 2rem; }
+  .header h1 { font-size: 1.8rem; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 10px; }
+  .header h1 i { color: var(--primary); }
+  .header p { color: var(--muted); font-size: 0.95rem; margin-top: 0.5rem; }
+
+  /* Tabs */
+  .payment-tabs { display: flex; gap: 0.5rem; margin-bottom: 2rem; background: var(--bg); padding: 0.4rem; border-radius: 12px; }
+  .tab-btn {
+    flex: 1; padding: 0.8rem; border: none; background: transparent; border-radius: 8px;
+    font-weight: 600; color: var(--muted); cursor: pointer; transition: all 0.2s; font-size: 0.9rem;
+  }
+  .tab-btn.active { background: white; color: var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+  .tab-btn:hover:not(.active) { color: var(--text); }
+
+  /* Forms */
+  .payment-form { display: none; animation: fadeIn 0.3s ease; }
+  .payment-form.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .form-group { margin-bottom: 1.2rem; }
+  .form-group label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-bottom: 0.4rem; }
+  .input-wrapper { position: relative; }
+  .input-wrapper i { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+  .input-wrapper input, .input-wrapper select {
+    width: 100%; padding: 0.9rem 1rem 0.9rem 2.8rem; border: 1px solid var(--border); border-radius: 10px;
+    font-size: 1rem; font-weight: 500; transition: all 0.2s; background: var(--bg); color: var(--text);
+  }
+  .input-wrapper input:focus, .input-wrapper select:focus {
+    outline: none; border-color: var(--primary); background: white;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+  }
+  .input-wrapper input.error { border-color: var(--error); }
+  .error-msg { color: var(--error); font-size: 0.75rem; margin-top: 0.3rem; display: none; }
+  .error-msg.visible { display: block; }
+
+  /* Grid for expiry/cvv */
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+  /* Pay Button */
+  .pay-btn {
+    width: 100%; padding: 1rem; background: var(--primary); color: white; border: none;
+    border-radius: 10px; font-size: 1.1rem; font-weight: 600; cursor: pointer;
+    transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 1rem;
+  }
+  .pay-btn:hover { background: var(--primary-hover); transform: translateY(-2px); box-shadow: 0 8px 15px rgba(99, 102, 241, 0.3); }
+  .pay-btn:active { transform: translateY(0); }
+  .pay-btn.loading { pointer-events: none; opacity: 0.8; }
+  .spinner { display: none; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  .pay-btn.loading .spinner { display: block; }
+  .pay-btn.loading .btn-text { display: none; }
+
+  /* UPI specific */
+  .upi-apps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+  .upi-app {
+    border: 1px solid var(--border); border-radius: 12px; padding: 1rem; text-align: center;
+    cursor: pointer; transition: all 0.2s; background: var(--bg); display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .upi-app:hover { border-color: var(--primary); background: white; }
+  .upi-app.active { border-color: var(--primary); background: rgba(99, 102, 241, 0.05); }
+  .upi-app i { font-size: 1.8rem; color: var(--text); }
+  .upi-app span { font-size: 0.8rem; font-weight: 600; }
+
+  /* ---------- RIGHT PANEL: SUMMARY ---------- */
+  .summary-panel {
+    background: #f8fafc; padding: 3rem 2.5rem; border-left: 1px solid var(--border);
+    display: flex; flex-direction: column;
+  }
+  .summary-panel h2 { font-size: 1.2rem; margin-bottom: 1.5rem; color: var(--text); }
+  .order-item { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+  .item-icon { width: 50px; height: 50px; background: rgba(99, 102, 241, 0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--primary); font-size: 1.2rem; }
+  .item-details h4 { font-size: 0.95rem; margin-bottom: 2px; }
+  .item-details p { font-size: 0.8rem; color: var(--muted); }
+  .item-price { margin-left: auto; font-weight: 600; }
+  
+  .divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
+  
+  .cost-row { display: flex; justify-content: space-between; margin-bottom: 0.8rem; font-size: 0.9rem; color: var(--muted); }
+  .cost-row.total { font-size: 1.2rem; font-weight: 700; color: var(--text); margin-top: 1rem; }
+  
+  .secure-badge {
+    margin-top: auto; background: rgba(16, 185, 129, 0.1); color: #047857; padding: 0.8rem;
+    border-radius: 10px; display: flex; align-items: center; gap: 10px; font-size: 0.8rem; font-weight: 600;
+  }
+
+  /* ---------- SUCCESS OVERLAY ---------- */
+  .success-overlay {
+    position: fixed; inset: 0; background: var(--card-bg); z-index: 1000;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.4s ease;
+  }
+  .success-overlay.show { opacity: 1; pointer-events: auto; }
+  .success-icon {
+    width: 80px; height: 80px; background: var(--success); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; color: white; font-size: 2.5rem;
+    margin-bottom: 1.5rem; animation: scalePop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  }
+  @keyframes scalePop { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+  .success-overlay h2 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+  .success-overlay p { color: var(--muted); margin-bottom: 2rem; }
+  .receipt { background: var(--bg); padding: 1.5rem; border-radius: 12px; width: 100%; max-width: 300px; margin-bottom: 2rem; border: 1px dashed var(--border); }
+  .receipt-row { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .receipt-row.bold { font-weight: 700; font-size: 1.1rem; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
+
+  /* Responsive */
+  @media (max-width: 800px) {
+    .payment-wrapper { grid-template-columns: 1fr; }
+    .summary-panel { border-left: none; border-top: 1px solid var(--border); padding: 2rem; }
+    .checkout-panel { padding: 2rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Payment App Container -->
+<div class="payment-wrapper">
+  
+  <!-- LEFT: Checkout -->
+  <div class="checkout-panel">
+    <div class="header">
+      <h1><i class="fas fa-bolt"></i> PayFlow</h1>
+      <p>Complete your payment securely.</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="payment-tabs">
+      <button class="tab-btn active" onclick="switchTab('card')"><i class="fas fa-credit-card"></i> Card</button>
+      <button class="tab-btn" onclick="switchTab('upi')"><i class="fas fa-mobile-alt"></i> UPI</button>
+      <button class="tab-btn" onclick="switchTab('netbanking')"><i class="fas fa-university"></i> NetBanking</button>
+    </div>
+
+    <!-- Form: Card -->
+    <div id="form-card" class="payment-form active">
+      <form id="cardForm" onsubmit="processPayment(event)">
+        <div class="form-group">
+          <label>Card Number</label>
+          <div class="input-wrapper">
+            <i class="far fa-credit-card"></i>
+            <input type="text" id="cardNumber" placeholder="0000 0000 0000 0000" maxlength="19" oninput="formatCardNumber(this)" required>
+          </div>
+          <div class="error-msg" id="err-cardNumber">Please enter a valid 16-digit card number</div>
+        </div>
+
+        <div class="form-group">
+          <label>Cardholder Name</label>
+          <div class="input-wrapper">
+            <i class="far fa-user"></i>
+            <input type="text" id="cardName" placeholder="John Doe" required>
+          </div>
+          <div class="error-msg" id="err-cardName">Name is required</div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Expiry Date</label>
+            <div class="input-wrapper">
+              <i class="far fa-calendar-alt"></i>
+              <input type="text" id="cardExpiry" placeholder="MM/YY" maxlength="5" oninput="formatExpiry(this)" required>
+            </div>
+            <div class="error-msg" id="err-cardExpiry">Invalid date</div>
+          </div>
+          <div class="form-group">
+            <label>CVV</label>
+            <div class="input-wrapper">
+              <i class="fas fa-lock"></i>
+              <input type="password" id="cardCvv" placeholder="123" maxlength="4" oninput="formatCVV(this)" required>
+            </div>
+            <div class="error-msg" id="err-cardCvv">Invalid CVV</div>
+          </div>
+        </div>
+
+        <button type="submit" class="pay-btn" id="payBtnCard">
+          <span class="spinner"></span>
+          <span class="btn-text">Pay $249.99</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- Form: UPI -->
+    <div id="form-upi" class="payment-form">
+      <div class="upi-apps">
+        <div class="upi-app active" onclick="selectUpiApp(this, 'Google Pay')">
+          <i class="fab fa-google-pay" style="color: #4285F4;"></i>
+          <span>Google Pay</span>
+        </div>
+        <div class="upi-app" onclick="selectUpiApp(this, 'PhonePe')">
+          <i class="fas fa-mobile-alt" style="color: #5f259f;"></i>
+          <span>PhonePe</span>
+        </div>
+        <div class="upi-app" onclick="selectUpiApp(this, 'Paytm')">
+          <i class="fas fa-wallet" style="color: #00b9f1;"></i>
+          <span>Paytm</span>
+        </div>
+      </div>
+      <form id="upiForm" onsubmit="processPayment(event)">
+        <div class="form-group">
+          <label>Enter your UPI ID</label>
+          <div class="input-wrapper">
+            <i class="fas fa-at"></i>
+            <input type="text" id="upiId" placeholder="username@okhdfcbank" required>
+          </div>
+          <div class="error-msg" id="err-upiId">Valid UPI ID required (e.g., name@bank)</div>
+        </div>
+        <button type="submit" class="pay-btn" id="payBtnUpi">
+          <span class="spinner"></span>
+          <span class="btn-text">Pay $249.99</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- Form: NetBanking -->
+    <div id="form-netbanking" class="payment-form">
+      <form id="netBankingForm" onsubmit="processPayment(event)">
+        <div class="form-group">
+          <label>Select your Bank</label>
+          <div class="input-wrapper">
+            <i class="fas fa-university"></i>
+            <select id="bankSelect" required>
+              <option value="">Choose a bank...</option>
+              <option value="hdfc">HDFC Bank</option>
+              <option value="icici">ICICI Bank</option>
+              <option value="sbi">State Bank of India</option>
+              <option value="axis">Axis Bank</option>
+            </select>
+          </div>
+        </div>
+        <div class="secure-badge" style="margin-bottom: 1.5rem; background: #e0f2fe; color: #0369a1;">
+          <i class="fas fa-info-circle"></i>
+          You will be redirected to your bank's secure page.
+        </div>
+        <button type="submit" class="pay-btn" id="payBtnNetbanking">
+          <span class="spinner"></span>
+          <span class="btn-text">Proceed to Pay $249.99</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- RIGHT: Order Summary -->
+  <div class="summary-panel">
+    <h2>Order Summary</h2>
+    
+    <div class="order-item">
+      <div class="item-icon"><i class="fas fa-plane"></i></div>
+      <div class="item-details">
+        <h4>Flight to New York</h4>
+        <p>SkyBook Airways · Seat 14A</p>
+      </div>
+      <div class="item-price">$199.99</div>
+    </div>
+
+    <div class="order-item">
+      <div class="item-icon"><i class="fas fa-suitcase-rolling"></i></div>
+      <div class="item-details">
+        <h4>Extra Baggage</h4>
+        <p>10kg Check-in</p>
+      </div>
+      <div class="item-price">$50.00</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="cost-row">
+      <span>Subtotal</span>
+      <span>$249.99</span>
+    </div>
+    <div class="cost-row">
+      <span>Taxes & Fees</span>
+      <span>$0.00</span>
+    </div>
+    <div class="cost-row total">
+      <span>Total</span>
+      <span>$249.99</span>
+    </div>
+
+    <div class="secure-badge">
+      <i class="fas fa-shield-alt"></i>
+      Payments are 256-bit SSL encrypted
+    </div>
+  </div>
+
+</div>
+
+<!-- SUCCESS OVERLAY -->
+<div class="success-overlay" id="successOverlay">
+  <div class="success-icon"><i class="fas fa-check"></i></div>
+  <h2>Payment Successful!</h2>
+  <p>Your transaction has been completed.</p>
+  
+  <div class="receipt">
+    <div class="receipt-row">
+      <span>Transaction ID</span>
+      <span id="txnId" style="font-family: monospace;">TXN-000000</span>
+    </div>
+    <div class="receipt-row">
+      <span>Payment Method</span>
+      <span id="txnMethod">Card</span>
+    </div>
+    <div class="receipt-row bold">
+      <span>Amount Paid</span>
+      <span>$249.99</span>
+    </div>
+  </div>
+
+  <button class="pay-btn" style="max-width: 300px;" onclick="resetApp()">Make Another Payment</button>
+</div>
+
+<script>
+  // --- Tab Switching ---
+  function switchTab(tabId) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.payment-form').forEach(form => form.classList.remove('active'));
+    
+    event.currentTarget.classList.add('active');
+    document.getElementById('form-' + tabId).classList.add('active');
+  }
+
+  // --- UPI App Selection ---
+  let selectedUpiApp = 'Google Pay';
+  function selectUpiApp(element, appName) {
+    document.querySelectorAll('.upi-app').forEach(el => el.classList.remove('active'));
+    element.classList.add('active');
+    selectedUpiApp = appName;
+  }
+
+  // --- Input Formatting & Validation ---
+  function formatCardNumber(input) {
+    let val = input.value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    let formatted = val.match(/.{1,4}/g)?.join(' ') || val;
+    input.value = formatted;
+    
+    if (val.length === 16) {
+      input.classList.remove('error');
+      document.getElementById('err-cardNumber').classList.remove('visible');
+    } else {
+      input.classList.add('error');
+      document.getElementById('err-cardNumber').classList.add('visible');
+    }
+  }
+
+  function formatExpiry(input) {
+    let val = input.value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    if (val.length >= 2) {
+      input.value = val.substring(0, 2) + '/' + val.substring(2, 4);
+    } else {
+      input.value = val;
+    }
+    
+    const isValid = /^(0[1-9]|1[0-2])\/?([0-9]{2})$/.test(input.value);
+    if (isValid) {
+      input.classList.remove('error');
+      document.getElementById('err-cardExpiry').classList.remove('visible');
+    } else {
+      input.classList.add('error');
+      document.getElementById('err-cardExpiry').classList.add('visible');
+    }
+  }
+
+  function formatCVV(input) {
+    input.value = input.value.replace(/[^0-9]/g, '');
+    if (input.value.length >= 3) {
+      input.classList.remove('error');
+      document.getElementById('err-cardCvv').classList.remove('visible');
+    } else {
+      input.classList.add('error');
+      document.getElementById('err-cardCvv').classList.add('visible');
+    }
+  }
+
+  // --- Process Payment ---
+  function processPayment(e) {
+    e.preventDefault();
+    
+    // Find active form and button
+    const activeForm = document.querySelector('.payment-form.active form');
+    const activeBtn = activeForm.querySelector('.pay-btn');
+    
+    // Simple custom validation check
+    let hasErrors = false;
+    activeForm.querySelectorAll('input, select').forEach(input => {
+      if (input.value.trim() === '') {
+        input.classList.add('error');
+        hasErrors = true;
+      }
+    });
+
+    if (hasErrors) return;
+
+    // Set loading state
+    activeBtn.classList.add('loading');
+
+    // Simulate API call
+    setTimeout(() => {
+      activeBtn.classList.remove('loading');
+      
+      // Determine payment method name
+      let method = "Credit Card";
+      if (activeForm.id === 'upiForm') method = `UPI (${selectedUpiApp})`;
+      if (activeForm.id === 'netBankingForm') method = "NetBanking";
+
+      // Show success screen
+      showSuccess(method);
+    }, 2000);
+  }
+
+  // --- Success Screen Logic ---
+  function showSuccess(method) {
+    const overlay = document.getElementById('successOverlay');
+    const txnId = 'TXN-' + Math.floor(100000 + Math.random() * 900000);
+    
+    document.getElementById('txnId').textContent = txnId;
+    document.getElementById('txnMethod').textContent = method;
+    
+    overlay.classList.add('show');
+  }
+
+  // --- Reset App ---
+  function resetApp() {
+    document.getElementById('successOverlay').classList.remove('show');
+    document.querySelectorAll('form').forEach(form => form.reset());
+    document.querySelectorAll('input').forEach(input => input.classList.remove('error'));
+    document.querySelectorAll('.error-msg').forEach(msg => msg.classList.remove('visible'));
+  }
+</script>
+</body>
+</html>
